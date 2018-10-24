@@ -1,289 +1,339 @@
-/* Jeu de Puissance 4 - Simplon LPS 3
- * Ce jeu se joue à deux joueurs sur une grille de hauteur 6 et de largeur 7.
- * Les joueurs laissent tomber chacun leur tour un jeton dans une colonne.
- * Lorsqu’un joueur aligne 4 jetons de sa couleur (en ligne ou en diagonale), il a gagné.
- * Il peut arriver qu’aucun joueur ne parvienne à aligner 4 jetons, donnant lieu à un match nul.
- */
-
 import java.util.Scanner;
-
 
 public class Puissance4 {
 
+    private static Scanner saisie;
+    private static int nbreLignes = 6, nbreColonnes = 7, nbreJetonsNecessaires = 4, compteur = 0;
+    private static boolean partieFinie = false;
 
-	static Scanner saisie;
-	static int nbCol = 7, nbLig = 6;
-	static int nbJetonsNecessaires = 4;
-	static int joueurEnCours = 1, ligneEnCours = 0, colEnCours = 0;
-	static int[][] grille = new int[nbCol][nbLig];
-	static String[] joueur = new String[3]; // la variable joueur[0] ne sera pas utilisée...
-	static char[] jeton = { ' ', 'O', '@' };
-	static int compteur = 0;
-	static boolean partieFinie = false;
+    public static void main(String args[]) {
 
-
-	public static void main(String[] args) {
-		saisie = new Scanner(System.in);
-		System.out.println(choixModeJeu());
-		partieJeu();
-
-	}
-
-	public static int choixModeJeu() {
-    System.out.println("Choisissez le mode de jeu :");
-    System.out.println(" 1 - Mode un joueur VS computer");
-    System.out.println(" 2 - Mode deux joueurs");
-    boolean choixValide = true;
-    do {
-    String choixMode = saisie.nextLine();
-    if (!choixMode.matches("[1-2]")) {
-      System.out.println("Choix incorrect");
-      choixValide = false;
+        Grid grille = new Grid(nbreColonnes, nbreLignes);
+        ModeDeJeu modeJeu = new ModeDeJeu(choixModeDeJeu());
+        Joueur[] joueur = new Joueur[3];
+        initJoueurs(joueur, modeJeu);
+        int joueurEnCours = tirageAuSort();
+        System.out.println("C'est " + joueur[joueurEnCours].name + " (" + joueur[joueurEnCours].jeton + ") qui commence.");
+        affichageGrille(grille);
+        jouer(grille, modeJeu, joueur, joueurEnCours);
     }
-  } while (!choixValide);
-  return Integer.parseInt(choixMode);
-
-}
-
-	public static void initJoueurs() {
-		for (int i = 1; i < 3; i++) {
-			System.out.println("Joueur " + (i) + " entrez votre prénom : ");
-			joueur[i] = saisie.nextLine();
-		}
-		System.out.println(joueur[1] + " " + jeton[1] + "  vs  " + joueur[2] + " " + jeton[2]);
-	}
 
 
-	public static void tirageAuSort() {
-		int hasard = (int) (Math.random() * 10);
-		joueurEnCours = (hasard % 2 == 0) ? 1 : 2;
-		System.out.println("C'est " + joueur[joueurEnCours] + " qui commence...\n");
-	}
+    private static void jouer(Grid grille, ModeDeJeu modeJeu, Joueur[] joueur, int joueurEnCours) {
+
+        do {
+            if (modeJeu.getModeDeJeu() == 1 && joueurEnCours == 2) {
+                partieFinie = computerPlaying(grille, joueur[1], joueur[1].lastColonne, joueur[1].lastLigne, joueur[2]);
+            } else {
+                choixColonne(joueur[joueurEnCours], grille);
+            }
+            affichageGrille(grille);
+
+            if (!((modeJeu.getModeDeJeu() == 1) && (joueurEnCours == 2))) {
+                if (verifHorizontale(grille, joueur[joueurEnCours], joueur[joueurEnCours].lastLigne) || verifVerticale(grille, joueur[joueurEnCours], joueur[joueurEnCours].lastColonne) || verifDiagonales(grille, joueur[joueurEnCours], joueur[joueurEnCours].lastColonne, joueur[joueurEnCours].lastLigne)) {
+                    finPartie(joueur[joueurEnCours]);
+                    partieFinie = true;
+                }
+                if (verifGrillePleine()) {
+                    matchNul();
+                    partieFinie = true;
+                }
+            }
+            joueurEnCours = joueurEnCours % 2 + 1;
+        } while (!partieFinie);
+    }
 
 
-	public static void affichageGrille() {
-		compteur++;
-		System.out.println("\nTOUR NUMERO " + compteur + "\n");
+    private static void initJoueurs(Joueur[] joueur, ModeDeJeu modeJeu) {
+        if (modeJeu.getModeDeJeu() == 1) {
+            joueur[2] = new Joueur(2, "Computer");
+        }
 
-		for (int i = nbLig - 1; i >= 0; i--) {
-			for (int j = 0; j < nbCol; j++) {
-				System.out.print("| " + jeton[grille[j][i]] + " ");
-			}
-			System.out.println("|");
-		}
+        for (
+                int i = 1; i < modeJeu.getModeDeJeu() + 1; i++) {
+            joueur[i] = new Joueur(i, getNom(i));
+        }
 
-		for (int i = 0; i < nbCol; i++) {
-			System.out.print("|---");
-		}
+        for (
+                int i = 1;
+                i < 3; i++) {
+            System.out.println(joueur[i].toString());
+        }
 
-		System.out.println("|");
-
-		for (int i = 0; i < nbCol; i++) {
-			System.out.print("| " + i + " ");
-		}
-
-		System.out.println("|");
-	}
+    }
 
 
-	public static void choixColonne() {
-		int colChoix = 0;
-		boolean choixValide;
+    private static int choixModeDeJeu() {
+        System.out.println("Choisissez le mode de jeu :\n1 - Mode un joueur VS computer\n2 - Mode deux joueurs");
+        boolean choixValide;
+        String choixMode;
+        saisie = new Scanner(System.in);
+        do {
+            choixValide = true;
+            choixMode = saisie.nextLine();
+            if (!choixMode.matches("[1-2]")) {
+                System.out.println("Choix incorrect, recommencez : ");
+                choixValide = false;
+            }
+        } while (!choixValide);
+        return Integer.parseInt(choixMode);
 
-		do {
-			choixValide = false;
-
-		    System.out.println("\n" + joueur[joueurEnCours] + " (" + jeton[joueurEnCours]
-		        + ") , veuillez choisir votre colonne : ");
-					String choix = saisie.nextLine();
-
-				if (choix.matches("[0-9]")) {
-					choixValide=true;
-					colChoix = Integer.parseInt(choix);
-						if (colChoix<0 || colChoix>nbCol) {
-							System.out.println("Choix invalide recommencez.");
-							choixValide = false;
-						}
-				} else {
-					System.out.println("Choix invalide recommencez.");
-				}
-		} while (choixValide == false);
-
-		testColonne(colChoix);
-
-		colEnCours = colChoix;
-		ligneEnCours = detLig();
-	}
+    }
 
 
-	public static void testColonne(int col) { // méthode pour vérifier si la colonne est pleine.
-		if (grille[col][nbLig-1] != 0) {
-			System.out.println("Colonne pleine recommencez.");
-			choixColonne();
-		}
-	}
-		// Cette boucle va enregistrer la position du jeton dans la grille
-		// La colonne est celle indiquée par le joueur.
-		// La ligne correspondra à la première case disponible dans cette colonne.
+    private static String getNom(int num) {
+        System.out.println("Joueur " + (num) + " entrez votre prénom : ");
+        return saisie.nextLine();
+    }
+
+    private static int tirageAuSort() {
+        int hasard = (int) (Math.random() * 10);
+        return (hasard % 2 == 0) ? 1 : 2;
+    }
+
+    private static void affichageGrille(Grid grille) {
+        compteur++;
+        System.out.println("\nTOUR NUMERO " + compteur + "\n");
+        String affichageCase = " O@";
+        for (int i = nbreLignes - 1; i >= 0; i--) {
+            for (int j = 0; j < nbreColonnes; j++) {
+                System.out.print("| " + affichageCase.charAt(grille.getCases(j, i)) + " ");
+            }
+            System.out.println("|");
+        }
+
+        for (int i = 0; i < nbreColonnes; i++) {
+            System.out.print("|---");
+        }
+
+        System.out.println("|");
+
+        for (int i = 0; i < nbreColonnes; i++) {
+            System.out.print("| " + i + " ");
+        }
+
+        System.out.println("|");
+    }
 
 
-	public static int detLig() { //détermine à quelle ligne le jeton s'arrête.
-		for (int i = 0; i < nbLig; i++) {
-			if (grille[colEnCours][i] == 0) {
-				grille[colEnCours][i] = joueurEnCours;
-				return i;
-			}
-		}
-		return 0;
-	}
+    private static void choixColonne(Joueur joueur, Grid grille) {
+        int colonneChoisie = 0;
+        boolean choixValide;
 
 
-	public static boolean verifHoriz() {
-		int compteurJeton = 0;
+        do {
+            choixValide = false;
 
-		for (int i = 0; i < nbCol; i++) {
+            System.out.println("\n" + joueur + ", veuillez choisir votre colonne : ");
+            String choix = saisie.nextLine();
 
-			if (grille[i][ligneEnCours] != joueurEnCours) {
-				compteurJeton = 0;
-			}
-			if (grille[i][ligneEnCours] == joueurEnCours) {
-				compteurJeton++;
-			}
-			if (compteurJeton == nbJetonsNecessaires) {
-				return true;
-			}
-		}
-		return false;
-	}
+            if (choix.matches("[0-9]")) {
+                choixValide = true;
+                colonneChoisie = Integer.parseInt(choix);
+                if ((colonneChoisie < 0) || (colonneChoisie >= nbreColonnes)) {
+                    System.out.println("Choix invalide recommencez.");
+                    choixValide = false;
+                }
+            } else System.out.println("Choix invalide recommencez.");
+        } while (!choixValide);
 
+        testColonne(joueur, grille, colonneChoisie);
+        joueur.setLastColonne(colonneChoisie);
+        joueur.setLastLigne(determineLigne(joueur, grille, colonneChoisie));
+    }
 
-	public static boolean verifVertic() {
-		int compteurJeton = 0;
+    private static int determineLigne(Joueur joueur, Grid grille, int colonneChoisie) { //détermine à quelle ligne le jeton s'arrête.
+        for (int i = 0; i < nbreLignes; i++) {
+            if (grille.cases[colonneChoisie][i] == 0) {
+                grille.cases[colonneChoisie][i] = joueur.id;
+                return i;
+            }
+        }
+        return 0;
+    }
 
-		for (int i = 0; i < nbLig; i++) {
-			if (grille[colEnCours][i] != joueurEnCours) {
-				compteurJeton = 0;
-			}
-			if (grille[colEnCours][i] == joueurEnCours) {
-				compteurJeton++;
-			}
-			if (compteurJeton == nbJetonsNecessaires) {
-				return true;
-			}
-		}
-		return false;
-	}
+    private static int determineLigne(Grid grille, int colonneTestee) {
+        for (int i = 0; i < nbreLignes; i++) {
+            if (grille.cases[colonneTestee][i] == 0) {
+                return i;
+            }
+        }
+        return 0;
+    }
 
-
-	public static boolean verifDiag() {
-		int colTest = colEnCours;
-		int ligneTest = ligneEnCours;
-		int compteurJeton = 1;
-		boolean continueWhile = true;
-
-		// verif première diagonale : / du bas à gauche du tableau vers le haut à droite du tableau
-
-		while (colTest > 0 && ligneTest > 0 && continueWhile) {
-			colTest--;
-			ligneTest--;
-
-			if (grille[colTest][ligneTest] == joueurEnCours) {
-				compteurJeton++;
-			} else {
-				continueWhile = false;
-			}
-		}
-
-		continueWhile = true;
-		colTest = colEnCours;
-		ligneTest = ligneEnCours;
-		while (colTest < nbCol - 1 && ligneTest < nbLig - 1 && continueWhile) {
-			colTest++;
-			ligneTest++;
-			if (grille[colTest][ligneTest] == joueurEnCours) {
-				compteurJeton++;
-			} else {
-				continueWhile = false;
-			}
-		}
-
-		if (compteurJeton >= nbJetonsNecessaires) {
-			return true;
-		}
+    private static void testColonne(Joueur joueur, Grid grille, int colonne) { // méthode pour vérifier si la colonne est pleine.
+        if (grille.cases[colonne][nbreLignes - 1] != 0) {
+            System.out.println("Colonne pleine recommencez.");
+            choixColonne(joueur, grille);
+        }
+    }
 
 
-		// verif deuxième diagonale : \ du haut à gauche du tableau vers le bas à droite du tableau
-		compteurJeton = 1;
-		continueWhile = true;
-		colTest = colEnCours;
-		ligneTest = ligneEnCours;
-		while (colTest > 0 && ligneTest < nbLig - 1 && continueWhile) {
-			colTest--;
-			ligneTest++;
-			if (grille[colTest][ligneTest] == joueurEnCours) {
-				compteurJeton++;
-			} else {
-				continueWhile = false;
-			}
-		}
+    private static boolean verifHorizontale(Grid grille, Joueur joueur, int ligne) {
+        int compteurJeton = 0;
 
-		continueWhile = true;
-		colTest = colEnCours;
-		ligneTest = ligneEnCours;
-		while (colTest < nbCol - 1 && ligneTest > 0 && continueWhile) {
-			colTest++;
-			ligneTest--;
-			if (grille[colTest][ligneTest] == joueurEnCours) {
-				compteurJeton++;
-			} else {
-				continueWhile = false;
-			}
-		}
-		if (compteurJeton >= nbJetonsNecessaires) {
-			return true;
-		}
+        for (int i = 0; i < nbreColonnes; i++) {
 
-		return false;
-	}
+            if (grille.cases[i][ligne] != joueur.id) {
+                compteurJeton = 0;
+            }
+            if (grille.cases[i][ligne] == joueur.id) {
+                compteurJeton++;
+            }
+            if (compteurJeton == nbreJetonsNecessaires) {
+                return true;
+            }
+        }
+        return false;
+    }
 
 
-	public static boolean verifGrillePleine() {
-		return compteur == (nbLig * nbCol + 1);
-	}
+    private static boolean verifVerticale(Grid grille, Joueur joueur, int colonne) {
+        int compteurJeton = 0;
+
+        for (int i = 0; i < nbreLignes; i++) {
+            if (grille.cases[colonne][i] != joueur.id) {
+                compteurJeton = 0;
+            }
+            if (grille.cases[colonne][i] == joueur.id) {
+                compteurJeton++;
+            }
+            if (compteurJeton == nbreJetonsNecessaires) {
+                return true;
+            }
+        }
+        return false;
+    }
 
 
-	public static void finPartie() {
-		partieFinie = true;
-		System.out.println("La partie est terminée : " + joueur[joueurEnCours] + " gagne");
-	}
+    public static boolean verifDiagonales(Grid grille, Joueur joueur, int colonne, int ligne) {
+        int colTest = colonne;
+        int ligneTest = ligne;
+        int compteurJeton = 1;
+        boolean continueWhile = true;
+
+        // verif première diagonale : / du bas à gauche du tableau vers le haut à droite du tableau
+
+        while (colTest > 0 && ligneTest > 0 && continueWhile) {
+            colTest--;
+            ligneTest--;
+
+            if (grille.cases[colTest][ligneTest] == joueur.id) {
+                compteurJeton++;
+            } else {
+                continueWhile = false;
+            }
+        }
+
+        continueWhile = true;
+        colTest = colonne;
+        ligneTest = ligne;
+        while (colTest < nbreColonnes - 1 && ligneTest < nbreLignes - 1 && continueWhile) {
+            colTest++;
+            ligneTest++;
+            if (grille.cases[colTest][ligneTest] == joueur.id) {
+                compteurJeton++;
+            } else {
+                continueWhile = false;
+            }
+        }
+
+        if (compteurJeton >= nbreJetonsNecessaires) {
+            return true;
+        }
 
 
-	public static void partieNul() {
-		partieFinie = true;
-		System.out.println("La grille est pleine, match nul");
-	}
+        // verif deuxième diagonale : \ du haut à gauche du tableau vers le bas à droite du tableau
+        compteurJeton = 1;
+        continueWhile = true;
+        colTest = colonne;
+        ligneTest = ligne;
+        while (colTest > 0 && ligneTest < nbreLignes - 1 && continueWhile) {
+            colTest--;
+            ligneTest++;
+            if (grille.cases[colTest][ligneTest] == joueur.id) {
+                compteurJeton++;
+            } else {
+                continueWhile = false;
+            }
+        }
 
-	public static void partieJeu() {
-		initJoueurs();
-		tirageAuSort();
-		affichageGrille();
+        continueWhile = true;
+        colTest = colonne;
+        ligneTest = ligne;
+        while (colTest < nbreColonnes - 1 && ligneTest > 0 && continueWhile) {
+            colTest++;
+            ligneTest--;
+            if (grille.cases[colTest][ligneTest] == joueur.id) {
+                compteurJeton++;
+            } else {
+                continueWhile = false;
+            }
+        }
+        if (compteurJeton >= nbreJetonsNecessaires) {
+            return true;
+        }
 
-		do {
-			choixColonne();
-			affichageGrille();
+        return false;
+    }
 
-			if (verifHoriz() || (verifVertic()) || (verifDiag())) {
-				finPartie();
-			}
 
-			else if (verifGrillePleine()) {
-				partieNul();
-			}
-			// Les tests de vérification n'ont pas désigné de vainqueur ou une partie nulle :
-			// On change de joueur, et la partie continue
-			joueurEnCours = joueurEnCours%2 + 1;
+    private static boolean verifGrillePleine() {
+        return compteur == (nbreLignes * nbreColonnes + 1);
+    }
 
-		} while (!partieFinie);
 
-	}
+    private static void finPartie(Joueur joueur) {
+        System.out.println("La partie est terminée : " + joueur.name + " gagne");
+    }
+
+
+    private static void matchNul() {
+        System.out.println("La grille est pleine, match nul");
+    }
+
+
+    private static boolean computerPlaying(Grid grille, Joueur joueur1, int colonneJoueur1, int ligneJoueur1, Joueur computer) {
+
+
+        int ligneTestee;
+
+        for (int i = 0; i < nbreColonnes; i++) {
+            if (grille.cases[i][nbreLignes-1] != 0) continue;
+                ligneTestee = determineLigne(grille, i);
+                grille.setCases(i,ligneTestee,2);
+                if (verifHorizontale(grille, computer, ligneTestee) || verifVerticale(grille, computer, i) || verifDiagonales(grille, computer, i, ligneTestee)) {
+                    finPartie(computer);
+                    return true;
+                } else {
+                    grille.setCases(i,ligneTestee,0);
+                }
+            }
+
+
+        for (int i = 0; i < nbreColonnes; i++) {
+            if (grille.cases[i][nbreLignes - 1] != 0) continue;
+                ligneTestee = determineLigne(grille, i);
+                grille.setCases(i,ligneTestee,1);
+                if (verifHorizontale(grille, joueur1, ligneTestee) || verifVerticale(grille, joueur1, i) || verifDiagonales(grille, joueur1, i, ligneTestee)) {
+                    grille.setCases(i, ligneTestee,2);
+                    return false;
+                } else {
+                    grille.setCases(i,ligneTestee,0);
+                }
+            }
+
+
+        for (int i = 0; i < nbreColonnes; i++) {
+            if (grille.cases[i][nbreLignes - 1] == 0) {
+                grille.setCases(i, determineLigne(grille,i), 2);
+
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+
 }
